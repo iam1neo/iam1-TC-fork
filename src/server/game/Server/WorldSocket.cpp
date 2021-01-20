@@ -53,13 +53,16 @@ private:
 
 using boost::asio::ip::tcp;
 
-uint32 const WorldSocket::ConnectionInitializeMagic = 0xF5EB1CE;
 std::string const WorldSocket::ServerConnectionInitialize("WORLD OF WARCRAFT CONNECTION - SERVER TO CLIENT");
 std::string const WorldSocket::ClientConnectionInitialize("WORLD OF WARCRAFT CONNECTION - CLIENT TO SERVER");
 uint32 const WorldSocket::MinSizeForCompression = 0x400;
 
-uint32 const SizeOfClientHeader[2] = { sizeof(uint16) + sizeof(uint16), sizeof(uint32) + sizeof(uint16) };
-uint32 const SizeOfServerHeader[2] = { sizeof(uint16) + sizeof(uint16), sizeof(uint32) + sizeof(uint16) };
+uint32 const SizeOfClientHeader[2] =
+{
+    6, 4
+};
+
+uint32 const SizeOfServerHeader[2] = { sizeof(uint16) + sizeof(uint32), sizeof(uint32) };
 
 WorldSocket::WorldSocket(tcp::socket&& socket) : Socket(std::move(socket)),
     _type(CONNECTION_TYPE_REALM), _authSeed(rand32()), _OverSpeedPings(0),
@@ -113,14 +116,13 @@ void WorldSocket::CheckIpCallback(PreparedQueryResult result)
         }
     }
 
-    _packetBuffer.Resize(4 + 2 + ClientConnectionInitialize.length() + 1);
+    _packetBuffer.Resize(2 + ClientConnectionInitialize.length() + 1);
 
     AsyncReadWithCallback(&WorldSocket::InitializeHandler);
 
     MessageBuffer initializer;
     ServerPktHeader header;
     header.Setup.Size = ServerConnectionInitialize.size();
-    initializer.Write(&ConnectionInitializeMagic, sizeof(ConnectionInitializeMagic));
     initializer.Write(&header, sizeof(header.Setup.Size));
     initializer.Write(ServerConnectionInitialize.c_str(), ServerConnectionInitialize.length());
 
@@ -156,14 +158,8 @@ void WorldSocket::InitializeHandler(boost::system::error_code error, std::size_t
                 return;
             }
 
-            uint32 magic;
-            uint16 length;
-            ByteBuffer buffer(std::move(_packetBuffer));
-
-            buffer >> magic;
-            buffer >> length;
-            std::string initializer = buffer.ReadString(length);
-            if (magic != ConnectionInitializeMagic || initializer != ClientConnectionInitialize)
+            std::string initializer(reinterpret_cast<char const*>(_packetBuffer.GetReadPointer() + 2), std::min(_packetBuffer.GetActiveSize() - 2, ClientConnectionInitialize.length()));
+            if (initializer != ClientConnectionInitialize)
             {
                 CloseSocket();
                 return;
@@ -326,12 +322,12 @@ void WorldSocket::ExtractOpcodeAndSize(ClientPktHeader const* header, uint32& op
     if (_authCrypt.IsInitialized())
     {
         opcode = header->Normal.Command;
-        size = header->Normal.Size - 2;
+        size = header->Normal.Size;
     }
     else
     {
         opcode = header->Setup.Command;
-        size = header->Setup.Size - 2;
+        size = header->Setup.Size - 4;
     }
 }
 
@@ -346,7 +342,7 @@ bool WorldSocket::ReadHeaderHandler()
 {
     ASSERT(_headerBuffer.GetActiveSize() == SizeOfClientHeader[_authCrypt.IsInitialized()], "Header size " SZFMTD " different than expected %u", _headerBuffer.GetActiveSize(), SizeOfClientHeader[_authCrypt.IsInitialized()]);
 
-    _authCrypt.DecryptRecv(_headerBuffer.GetReadPointer(), 4);
+    _authCrypt.DecryptRecv(_headerBuffer.GetReadPointer(), _headerBuffer.GetActiveSize());
 
     ClientPktHeader* header = reinterpret_cast<ClientPktHeader*>(_headerBuffer.GetReadPointer());
     uint32 opcode;
@@ -518,8 +514,8 @@ void WorldSocket::WritePacketToBuffer(EncryptablePacket const& packet, MessageBu
     if (packetSize > MinSizeForCompression && packet.NeedsEncryption())
     {
         CompressedWorldPacket cmp;
-        cmp.UncompressedSize = packetSize + 2;
-        cmp.UncompressedAdler = adler32(adler32(0x9827D8F1, (Bytef*)&opcode, 2), packet.contents(), packetSize);
+        cmp.UncompressedSize = packetSize + 4;
+        cmp.UncompressedAdler = adler32(adler32(0x9827D8F1, (Bytef*)&opcode, 4), packet.contents(), packetSize);
 
         // Reserve space for compression info - uncompressed size and checksums
         uint8* compressionInfo = buffer.GetWritePointer();
@@ -538,17 +534,15 @@ void WorldSocket::WritePacketToBuffer(EncryptablePacket const& packet, MessageBu
     else if (!packet.empty())
         buffer.Write(packet.contents(), packet.size());
 
-    packetSize += 2 /*opcode*/;
-
     if (packet.NeedsEncryption())
     {
         header.Normal.Size = packetSize;
         header.Normal.Command = opcode;
-        _authCrypt.EncryptSend((uint8*)&header, 4);
+        _authCrypt.EncryptSend((uint8*)&header, sizeOfHeader);
     }
     else
     {
-        header.Setup.Size = packetSize;
+        header.Setup.Size = packetSize + 4;
         header.Setup.Command = opcode;
     }
 
@@ -558,12 +552,12 @@ void WorldSocket::WritePacketToBuffer(EncryptablePacket const& packet, MessageBu
 uint32 WorldSocket::CompressPacket(uint8* buffer, WorldPacket const& packet)
 {
     uint32 opcode = packet.GetOpcode();
-    uint32 bufferSize = deflateBound(_compressionStream, packet.size() + sizeof(uint16));
+    uint32 bufferSize = deflateBound(_compressionStream, packet.size() + sizeof(opcode));
 
     _compressionStream->next_out = buffer;
     _compressionStream->avail_out = bufferSize;
     _compressionStream->next_in = (Bytef*)&opcode;
-    _compressionStream->avail_in = sizeof(uint16);
+    _compressionStream->avail_in = sizeof(uint32);
 
     int32 z_res = deflate(_compressionStream, Z_NO_FLUSH);
     if (z_res != Z_OK)
