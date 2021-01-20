@@ -52,13 +52,13 @@ union ClientPktHeader
     struct
     {
         uint16 Size;
-        uint16 Command;
+        uint32 Command;
     } Setup;
 
     struct
     {
-        uint32 Size;
-        uint16 Command;
+        uint32 Command : 13;
+        uint32 Size : 19;
     } Normal;
 
     static bool IsValidSize(uint32 size) { return size < 10240; }
@@ -69,14 +69,9 @@ union ClientPktHeader
 
 class TC_GAME_API WorldSocket : public Socket<WorldSocket>
 {
-    static uint32 const ConnectionInitializeMagic;
     static std::string const ServerConnectionInitialize;
     static std::string const ClientConnectionInitialize;
     static uint32 const MinSizeForCompression;
-
-    static uint8 const AuthCheckSeed[16];
-    static uint8 const SessionKeySeed[16];
-    static uint8 const ContinuedSessionSeed[16];
 
     typedef Socket<WorldSocket> BaseSocket;
 
@@ -136,7 +131,7 @@ private:
 
     ConnectionType _type;
 
-    BigNumber _serverChallenge;
+    uint32 _authSeed;
     WorldPacketCrypt _authCrypt;
     BigNumber _encryptSeed;
     BigNumber _decryptSeed;

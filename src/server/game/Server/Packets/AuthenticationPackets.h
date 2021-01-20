@@ -38,7 +38,7 @@ namespace WorldPackets
 
             WorldPacket const* Write() override;
 
-            std::array<uint8, 16> Challenge;
+            uint32 Challenge = 0;
             uint32 DosChallenge[8]; ///< Encryption seeds
             uint8 DosZeroBits = 0;
         };
@@ -46,27 +46,26 @@ namespace WorldPackets
         class AuthSession final : public ClientPacket
         {
         public:
-            static uint32 const DigestLength = 24;
-
             AuthSession(WorldPacket&& packet) : ClientPacket(CMSG_AUTH_SESSION, std::move(packet))
             {
-                LocalChallenge.fill(0);
-                Digest.fill(0);
+                memset(Digest, 0, SHA_DIGEST_LENGTH);
             }
 
             void Read() override;
 
-            uint16 Build = 0;
-            int8 BuildType = 0;
-            uint32 RegionID = 0;
             uint32 BattlegroupID = 0;
+            int8 LoginServerType = 0;           ///< Auth type used - 0 GRUNT, 1 battle.net
+            int8 BuildType = 0;
             uint32 RealmID = 0;
-            std::array<uint8, 16> LocalChallenge;
-            std::array<uint8, DigestLength> Digest;
+            uint16 Build = 0;
+            uint32 LocalChallenge = 0;
+            int32 LoginServerID = 0;
+            uint32 RegionID = 0;
             uint64 DosResponse = 0;
-            ByteBuffer AddonInfo;
-            std::string RealmJoinTicket;
+            uint8 Digest[SHA_DIGEST_LENGTH];
+            std::string Account;
             bool UseIPv6 = false;
+            ByteBuffer AddonInfo;
         };
 
         class AuthResponse final : public ServerPacket
@@ -122,7 +121,7 @@ namespace WorldPackets
 
             Optional<AuthSuccessInfo> SuccessInfo; ///< contains the packet data in case that it has account information (It is never set when WaitInfo is set), otherwise its contents are undefined.
             Optional<AuthWaitInfo> WaitInfo; ///< contains the queue wait information in case the account is in the login queue.
-            uint32 Result = 0; ///< the result of the authentication process, it is AUTH_OK if it succeeded and the account is ready to log in. It can also be AUTH_WAIT_QUEUE if the account entered the login queue (Queued, QueuePos), possible values are @ref ResponseCodes
+            uint8 Result = 0; ///< the result of the authentication process, it is AUTH_OK if it succeeded and the account is ready to log in. It can also be AUTH_WAIT_QUEUE if the account entered the login queue (Queued, QueuePos), possible values are @ref ResponseCodes
         };
 
         enum class ConnectToSerial : uint32
@@ -170,20 +169,16 @@ namespace WorldPackets
         class AuthContinuedSession final : public ClientPacket
         {
         public:
-            static uint32 const DigestLength = 24;
-
             AuthContinuedSession(WorldPacket&& packet) : ClientPacket(CMSG_AUTH_CONTINUED_SESSION, std::move(packet))
             {
-                LocalChallenge.fill(0);
-                Digest.fill(0);
+                memset(Digest, 0, SHA_DIGEST_LENGTH);
             }
 
             void Read() override;
 
             uint64 DosResponse = 0;
             uint64 Key = 0;
-            std::array<uint8, 16> LocalChallenge;
-            std::array<uint8, DigestLength> Digest;
+            uint8 Digest[SHA_DIGEST_LENGTH];
         };
 
         class ResumeComms final : public ServerPacket
