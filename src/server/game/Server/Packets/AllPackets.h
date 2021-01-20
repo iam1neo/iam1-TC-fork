@@ -24,7 +24,6 @@
 #include "BankPackets.h"
 #include "BattlefieldPackets.h"
 #include "BattlegroundPackets.h"
-#include "BattlenetPackets.h"
 #include "BattlePetPackets.h"
 #include "BlackMarketPackets.h"
 #include "CalendarPackets.h"
