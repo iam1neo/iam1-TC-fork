@@ -43,7 +43,6 @@
 #include "ScriptMgr.h"
 #include "WardenWin.h"
 #include "AuthenticationPackets.h"
-#include "BattlenetRpcErrorCodes.h"
 #include "CharacterPackets.h"
 #include "ClientConfigPackets.h"
 #include "MiscPackets.h"
@@ -104,8 +103,7 @@ bool WorldSessionFilter::Process(WorldPacket* packet)
 }
 
 /// WorldSession constructor
-WorldSession::WorldSession(uint32 id, std::string&& name, uint32 battlenetAccountId, std::shared_ptr<WorldSocket> sock, AccountTypes sec, uint8 expansion, time_t mute_time,
-    std::string os, LocaleConstant locale, uint32 recruiter, bool isARecruiter):
+WorldSession::WorldSession(uint32 id, std::string&& name, uint32 battlenetAccountId, std::shared_ptr<WorldSocket> sock, AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale, uint32 recruiter, bool isARecruiter):
     m_muteTime(mute_time),
     m_timeOutTime(0),
     AntiDOS(this),
@@ -116,7 +114,6 @@ WorldSession::WorldSession(uint32 id, std::string&& name, uint32 battlenetAccoun
     _accountName(std::move(name)),
     _battlenetAccountId(battlenetAccountId),
     m_expansion(expansion),
-    _os(os),
     _warden(NULL),
     _logoutTime(0),
     m_inQueue(false),
@@ -1072,20 +1069,26 @@ void WorldSession::ProcessQueryCallbacks()
     }
 }
 
-void WorldSession::InitWarden(BigNumber* k)
+void WorldSession::InitWarden(BigNumber* k, std::string const& os)
 {
-    if (_os == "Win")
+    if (os == "Win")
     {
         _warden = new WardenWin();
         _warden->Init(this, k);
     }
-    else if (_os == "Wn64")
+    else if (os == "Wn64")
     {
         // Not implemented
     }
-    else if (_os == "Mc64")
+    else if (os == "Mc64")
     {
         // Not implemented
+    }
+    else if (os == "Mac")
+    {
+        // Disabled as it is causing the client to crash
+        // _warden = new WardenMac();
+        // _warden->Init(this, k);
     }
 }
 
@@ -1187,7 +1190,7 @@ void WorldSession::InitializeSession()
     if (!realmHolder->Initialize(GetAccountId(), GetBattlenetAccountId()))
     {
         delete realmHolder;
-        SendAuthResponse(ERROR_INTERNAL, false);
+        SendAuthResponse(AUTH_SYSTEM_ERROR, false);
         return;
     }
 
@@ -1196,7 +1199,7 @@ void WorldSession::InitializeSession()
     {
         delete realmHolder;
         delete holder;
-        SendAuthResponse(ERROR_INTERNAL, false);
+        SendAuthResponse(AUTH_SYSTEM_ERROR, false);
         return;
     }
 
@@ -1212,7 +1215,7 @@ void WorldSession::InitializeSessionCallback(SQLQueryHolder* realmHolder, SQLQue
     _collectionMgr->LoadAccountHeirlooms(holder->GetPreparedResult(AccountInfoQueryHolder::GLOBAL_ACCOUNT_HEIRLOOMS));
 
     if (!m_inQueue)
-        SendAuthResponse(ERROR_OK, false);
+        SendAuthResponse(AUTH_OK, false);
     else
         SendAuthWaitQue(0);
 
