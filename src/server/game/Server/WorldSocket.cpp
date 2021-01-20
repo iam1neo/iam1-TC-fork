@@ -395,10 +395,9 @@ WorldSocket::ReadDataHandlerResult WorldSocket::ReadDataHandler()
             }
 
             std::shared_ptr<WorldPackets::Auth::AuthSession> authSession = std::make_shared<WorldPackets::Auth::AuthSession>(std::move(packet));
-            //authSession->Read();
-            //HandleAuthSession(authSession);
-            //return ReadDataHandlerResult::WaitingForQuery;
-            return ReadDataHandlerResult::Error;
+            authSession->Read();
+            HandleAuthSession(authSession);
+            return ReadDataHandlerResult::WaitingForQuery;
         }
         case CMSG_AUTH_CONTINUED_SESSION:
         {
@@ -412,10 +411,9 @@ WorldSocket::ReadDataHandlerResult WorldSocket::ReadDataHandler()
             }
 
             std::shared_ptr<WorldPackets::Auth::AuthContinuedSession> authSession = std::make_shared<WorldPackets::Auth::AuthContinuedSession>(std::move(packet));
-            //authSession->Read();
-            //HandleAuthContinuedSession(authSession);
-            //return ReadDataHandlerResult::WaitingForQuery;
-            return ReadDataHandlerResult::Error;
+            authSession->Read();
+            HandleAuthContinuedSession(authSession);
+            return ReadDataHandlerResult::WaitingForQuery;
         }
         case CMSG_KEEP_ALIVE:
             LogOpcodeText(opcode, sessionGuard);
