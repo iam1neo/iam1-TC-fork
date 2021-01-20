@@ -34,7 +34,11 @@ class TC_SHARED_API RealmList
 public:
     typedef std::map<Battlenet::RealmHandle, Realm> RealmMap;
 
-    static RealmList* Instance();
+    static RealmList* instance()
+    {
+        static RealmList instance;
+        return &instance;
+    }
 
     ~RealmList();
 
@@ -57,5 +61,5 @@ private:
     boost::asio::ip::tcp::resolver* _resolver;
 };
 
-#define sRealmList RealmList::Instance()
+#define sRealmList RealmList::instance()
 #endif

@@ -31,12 +31,6 @@ RealmList::~RealmList()
     delete _updateTimer;
 }
 
-RealmList* RealmList::Instance()
-{
-    static RealmList instance;
-    return &instance;
-}
-
 // Load the realm list from the database
 void RealmList::Initialize(boost::asio::io_service& ioService, uint32 updateInterval)
 {
