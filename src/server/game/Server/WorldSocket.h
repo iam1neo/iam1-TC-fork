@@ -74,10 +74,6 @@ class TC_GAME_API WorldSocket : public Socket<WorldSocket>
     static std::string const ClientConnectionInitialize;
     static uint32 const MinSizeForCompression;
 
-    static uint8 const AuthCheckSeed[16];
-    static uint8 const SessionKeySeed[16];
-    static uint8 const ContinuedSessionSeed[16];
-
     typedef Socket<WorldSocket> BaseSocket;
 
 public:
@@ -136,7 +132,7 @@ private:
 
     ConnectionType _type;
 
-    BigNumber _serverChallenge;
+    uint32 _authSeed;
     WorldPacketCrypt _authCrypt;
     BigNumber _encryptSeed;
     BigNumber _decryptSeed;
