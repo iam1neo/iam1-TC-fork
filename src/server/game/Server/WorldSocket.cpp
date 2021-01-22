@@ -168,21 +168,9 @@ void WorldSocket::InitializeHandler(boost::system::error_code error, std::size_t
             ByteBuffer buffer(std::move(_packetBuffer));
 
             buffer >> magic;
-            if (magic != ConnectionInitializeMagic)
-            {
-                CloseSocket();
-                return;
-            }
-
             buffer >> length;
-            if (length > ClientConnectionInitialize.length())
-            {
-                CloseSocket();
-                return;
-            }
-
             std::string initializer = buffer.ReadString(length);
-            if (initializer != ClientConnectionInitialize)
+            if (magic != ConnectionInitializeMagic || initializer != ClientConnectionInitialize)
             {
                 CloseSocket();
                 return;
