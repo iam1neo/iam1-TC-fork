@@ -42,7 +42,7 @@
 #include "GitRevision.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
-#include "RealmList.h"
+#include "Realm/Realm.h"
 #include "DatabaseLoader.h"
 #include "AppenderDB.h"
 #include <openssl/opensslv.h>
@@ -50,7 +50,6 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/program_options.hpp>
-#include <google/protobuf/stubs/common.h>
 
 using namespace boost::program_options;
 
@@ -105,8 +104,6 @@ extern int main(int argc, char** argv)
     if (vm.count("help") || vm.count("version"))
         return 0;
 
-    GOOGLE_PROTOBUF_VERIFY_VERSION;
-
 #ifdef _WIN32
     if (configService.compare("install") == 0)
         return WinServiceInstall() ? 0 : 1;
@@ -127,6 +124,7 @@ extern int main(int argc, char** argv)
     // If logs are supposed to be handled async then we need to pass the io_service into the Log singleton
     sLog->Initialize(sConfigMgr->GetBoolDefault("Log.Async.Enable", false) ? &_ioService : nullptr);
 
+    TC_LOG_INFO("server.worldserver", "iam1 edition\n");
     TC_LOG_INFO("server.worldserver", "%s (worldserver-daemon)", GitRevision::GetFullVersion());
     TC_LOG_INFO("server.worldserver", "<Ctrl-C> to stop.\n");
     TC_LOG_INFO("server.worldserver", " ______                       __");
@@ -191,8 +189,6 @@ extern int main(int argc, char** argv)
 
     // Set server offline (not connectable)
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realm.Id.Realm);
-
-    sRealmList->Initialize(_ioService, sConfigMgr->GetIntDefault("RealmsStateUpdateDelay", 10));
 
     LoadRealmInfo();
 
@@ -280,7 +276,6 @@ extern int main(int argc, char** argv)
 
     // set server offline
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realm.Id.Realm);
-    sRealmList->Close();
 
     // Clean up threads if any
     if (soapThread != nullptr)
@@ -301,8 +296,6 @@ extern int main(int argc, char** argv)
     ShutdownCLIThread(cliThread);
 
     OpenSSLCrypto::threadsCleanup();
-
-    google::protobuf::ShutdownProtobufLibrary();
 
     // 0 - normal shutdown
     // 1 - shutdown at error
